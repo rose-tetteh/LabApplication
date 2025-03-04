@@ -33,6 +33,11 @@ jobs:
         aws s3 cp springApplication.zip s3://elasticapp-bucket/springApplication.zip-${{ github.sha }}.zip
         echo "S3 URL: s3://elasticapp-bucket/springApplication.zip-${{ github.sha }}.zip"
 
+        aws elasticbeanstalk create-application-version \
+          --application-name todo-application \
+          --version-label "build-${{ github.run_number }}-${{ github.sha }}" \
+          --source-bundle S3Bucket="elasticapp-bucket",S3Key="springApplication.zip-${{ github.sha }}.zip"
+
         # Deploy the new application version to the Elastic Beanstalk environment
         aws elasticbeanstalk update-environment \
           --environment-name Todo-application-env \
