@@ -36,6 +36,4 @@ jobs:
         # Deploy the new application version to the Elastic Beanstalk environment
         aws elasticbeanstalk update-environment \
           --environment-name Todo-application-env \
-          --version-label v1.0.0-${{ github.sha }}
-
-        echo "Deployment triggered for version v1.0.0-${{ github.sha }}"
+          --version-label "build-${{ github.run_number }}-${{ github.sha }}"
