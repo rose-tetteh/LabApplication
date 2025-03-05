@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      ECR_REGISTRY: public.ecr.aws/j1n7u2e7/rosetetteh_labapplication  # Replace with your ECR URI
+      ECR_REGISTRY: public.ecr.aws/j1n7u2e7  # Replace with your ECR URI
       ECR_REPOSITORY: rosetetteh_labapplication
       IMAGE_TAG: latest
     steps:
