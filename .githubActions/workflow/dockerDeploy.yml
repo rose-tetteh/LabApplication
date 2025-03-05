@@ -7,9 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ECR_REGISTRY: public.ecr.aws/j1n7u2e7/week4/labapp_repo  # Replace with your ECR URI
-      ECR_REPOSITORY: rosetetteh_labapplication
+      ECR_REPOSITORY: week4/labapp_repo
       IMAGE_TAG: latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -28,7 +27,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker build -t rosetetteh_labapplication -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
 
       - name: Push Docker image
         run: |
