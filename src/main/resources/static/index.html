@@ -201,6 +201,33 @@
             margin-top: 5px;
         }
 
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            transform: translateY(-100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .notification.error {
+            background-color: var(--delete-color);
+        }
+
+        .notification.success {
+            background-color: var(--completed-color);
+        }
+
+        .notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -234,28 +261,42 @@
     </div>
 </div>
 
+<div id="notification" class="notification"></div>
+
 <script>
     const API_URL = '/api/todos';
+
+    function showNotification(message, type = 'info') {
+        const notification = document.getElementById('notification');
+        notification.textContent = message;
+        notification.className = 'notification';
+        notification.classList.add(type);
+        notification.classList.add('show');
+
+        setTimeout(() => {
+            notification.classList.remove('show');
+        }, 3000);
+    }
+
+    function handleApiError(error, operation) {
+        console.error(`Error ${operation}:`, error);
+        showNotification(`Failed to ${operation}. Please try again.`, 'error');
+    }
 
     // Fetch all todos
     function fetchTodos() {
         fetch(API_URL)
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(todos => {
                 renderTodos(todos);
             })
             .catch(error => {
-                console.error('Error fetching todos:', error);
-                // For demo/development - create sample data if API fails
-                if (error.message.includes('Failed to fetch')) {
-                    console.log('Using sample data for development');
-                    const sampleTodos = [
-                        { id: 1, title: 'Eat Breakfast', description: '', completed: false, createdAt: new Date().toISOString() },
-                        { id: 2, title: 'Go to Gym', description: 'Cardio day', completed: false, createdAt: new Date().toISOString() },
-                        { id: 3, title: 'Study', description: 'Complete Todo app', completed: false, createdAt: new Date().toISOString() }
-                    ];
-                    renderTodos(sampleTodos);
-                }
+                handleApiError(error, 'fetch todos');
             });
     }
 
@@ -265,7 +306,7 @@
 
         todoList.innerHTML = '';
 
-        if (todos.length === 0) {
+        if (!todos || todos.length === 0) {
             emptyState.style.display = 'block';
             return;
         }
@@ -283,6 +324,8 @@
     function createTodoElement(todo) {
         const todoItem = document.createElement('li');
         todoItem.classList.add('todo-item');
+        todoItem.dataset.id = todo.id;
+
         if (todo.completed) {
             todoItem.classList.add('completed');
         }
@@ -341,9 +384,11 @@
     });
 
     function addNewTodo() {
-        const title = document.getElementById('todoTitle').value.trim();
+        const titleInput = document.getElementById('todoTitle');
+        const title = titleInput.value.trim();
 
         if (!title) {
+            showNotification('Please enter a task title', 'error');
             return;
         }
 
@@ -361,41 +406,45 @@
             },
             body: JSON.stringify(todo)
         })
-        .then(response => response.json())
-        .then(() => {
-            document.getElementById('todoTitle').value = '';
-            fetchTodos();
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then((newTodo) => {
+            titleInput.value = '';
+            showNotification('Task added successfully', 'success');
+
+            // Append the new todo to the list without refetching all todos
+            const todoList = document.getElementById('todoList');
+            const emptyState = document.getElementById('emptyState');
+
+            emptyState.style.display = 'none';
+            todoList.appendChild(createTodoElement(newTodo));
         })
         .catch(error => {
-            console.error('Error adding todo:', error);
-            // For demo purposes - simulate adding
-            if (error.message.includes('Failed to fetch')) {
-                document.getElementById('todoTitle').value = '';
-                const fakeTodo = {
-                    id: Date.now(),
-                    title,
-                    description: "",
-                    completed: false,
-                    createdAt: new Date().toISOString()
-                };
-                const todoList = document.getElementById('todoList');
-                const emptyState = document.getElementById('emptyState');
-
-                emptyState.style.display = 'none';
-                todoList.appendChild(createTodoElement(fakeTodo));
-            }
+            handleApiError(error, 'add task');
         });
     }
 
     // Toggle todo status
     function toggleTodoStatus(id, completed) {
+        // First, get the current todo
         fetch(`${API_URL}/${id}`, {
             method: 'GET'
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(todo => {
+            // Update the completed status
             todo.completed = completed;
 
+            // Send the updated todo back to the server
             return fetch(`${API_URL}/${id}`, {
                 method: 'PUT',
                 headers: {
@@ -404,20 +453,26 @@
                 body: JSON.stringify(todo)
             });
         })
-        .then(() => fetchTodos())
-        .catch(error => {
-            console.error('Error updating todo:', error);
-            // For demo purposes - simulate the update
-            if (error.message.includes('Failed to fetch')) {
-                const todoItem = document.querySelector(`.todo-item:nth-child(${id})`);
-                if (todoItem) {
-                    if (completed) {
-                        todoItem.classList.add('completed');
-                    } else {
-                        todoItem.classList.remove('completed');
-                    }
-                }
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
             }
+            return response.json();
+        })
+        .then(updatedTodo => {
+            // Update the UI to reflect the change
+            const todoItem = document.querySelector(`.todo-item[data-id="${id}"]`);
+            if (todoItem) {
+                if (updatedTodo.completed) {
+                    todoItem.classList.add('completed');
+                } else {
+                    todoItem.classList.remove('completed');
+                }
+                showNotification(`Task marked as ${updatedTodo.completed ? 'completed' : 'incomplete'}`, 'success');
+            }
+        })
+        .catch(error => {
+            handleApiError(error, 'update task status');
         });
     }
 
@@ -427,22 +482,27 @@
             fetch(`${API_URL}/${id}`, {
                 method: 'DELETE'
             })
-            .then(() => fetchTodos())
-            .catch(error => {
-                console.error('Error deleting todo:', error);
-                // For demo purposes - simulate deletion
-                if (error.message.includes('Failed to fetch')) {
-                    const todoItem = document.querySelector(`.todo-item:nth-child(${id})`);
-                    if (todoItem) {
-                        todoItem.style.animation = 'slideIn 0.3s reverse forwards';
-                        setTimeout(() => {
-                            todoItem.remove();
-                            if (document.querySelectorAll('.todo-item').length === 0) {
-                                document.getElementById('emptyState').style.display = 'block';
-                            }
-                        }, 300);
-                    }
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
                 }
+
+                // Remove the todo from the UI
+                const todoItem = document.querySelector(`.todo-item[data-id="${id}"]`);
+                if (todoItem) {
+                    todoItem.style.animation = 'slideIn 0.3s reverse forwards';
+                    setTimeout(() => {
+                        todoItem.remove();
+                        if (document.querySelectorAll('.todo-item').length === 0) {
+                            document.getElementById('emptyState').style.display = 'block';
+                        }
+                    }, 300);
+                }
+
+                showNotification('Task deleted successfully', 'success');
+            })
+            .catch(error => {
+                handleApiError(error, 'delete task');
             });
         }
     }
@@ -452,5 +512,3 @@
 </script>
 </body>
 </html>
-
-
